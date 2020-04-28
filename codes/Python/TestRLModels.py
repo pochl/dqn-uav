@@ -31,9 +31,9 @@ Controller = 'RL'
 # =============================================================================
 # Testing Parameters
 # =============================================================================
-Folder_Name = '**LiDAR_RL_200420201534' #File name of the experiment folder 
-max_env_steps = 1000    #Max episode steps
-n_episodes = 100        #Max number of episode for each test
+Folder_Name = '**Visual_RL_210420200111' #File name of the experiment folder 
+max_env_steps = 220    #Max episode steps
+n_episodes = 20       #Max number of episode for each test
 DeptEstSpeed = 0.1
 epsilon = 0             #Set to 0 for testing
 action_space_size = 3
@@ -70,7 +70,7 @@ if not os.path.exists(testpath):
 
 """Initialise neural network model"""
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-policy_net = DQN(InputDim,layers).to(device)
+policy_net = DQN(InputDim,layers,truestate,action_space_size).to(device)
 
 """Create connection with Unity"""
 host, port = "127.0.0.1" , 25001 #Must be identical to the ones in Unity code
@@ -80,7 +80,7 @@ sock.connect((host,port))
 """initialise classes"""
 transfer_data = transfer_data(sock, InputType, 
                               InputDim, DeptEstSpeed, truestate)
-Agent = Agent(Controller, action_space_size, InputDim)
+Agent = Agent(action_space_size)
 
 # =============================================================================
 # Begin the Testing 
@@ -91,7 +91,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, '*.h5')),
     file = filename.split("/")[-1]
     file = file[:-3]
     print(file)
-    policy_net = DQN(InputDim,layers).to(device)
+    policy_net = DQN(InputDim,layers,truestate, action_space_size).to(device)
     policy_net.load_state_dict(torch.load(filename))
     policy_net.eval() 
     
@@ -118,7 +118,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, '*.h5')),
 
         while not crash and tstep < max_env_steps:
             """Choose and send action to Unity"""
-            if InputType == "LiDAR":
+            if Controller == "RL":
                 action = Agent.choose_action_RL(
                         torch.tensor([state]), epsilon, 
                         policy_net, image)

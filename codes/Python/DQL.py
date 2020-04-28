@@ -20,10 +20,8 @@ def update_learning_rate(alpha_initial, alpha_decay,
         param_group['lr'] = alpha
 
 class Agent():  
-    def __init__(self, Controller, action_space_size, InputDim):
-        self.Controller = Controller
+    def __init__(self, action_space_size):
         self.action_space_size = action_space_size
-        self.InputDim = InputDim
        
     def get_reward(self, data):
         """Calculate reward at current time step"""
@@ -43,13 +41,13 @@ class Agent():
         return int(action)
 
 class DQN(nn.Module):
-    def __init__(self, InputDim,layers):
+    def __init__(self, InputDim,layers, truestate, action_space_size):
         super().__init__()      
         """create nn layers"""
-        self.fc1 = nn.Linear(in_features = np.prod(InputDim) + 3, 
+        self.fc1 = nn.Linear(in_features = np.prod(InputDim) + truestate, 
                              out_features = layers[0])
         self.fc2 = nn.Linear(in_features = layers[0], out_features = layers[1])
-        self.out = nn.Linear(in_features = layers[1], out_features = 3)
+        self.out = nn.Linear(in_features = layers[1], out_features = action_space_size)
 
     def forward(self, t):
         """feed forward"""

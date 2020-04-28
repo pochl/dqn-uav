@@ -50,7 +50,7 @@ class transfer_data():
         """Recieve raw data from Unity and process into state"""
         data_received = self.sock.recv(1024).decode("utf-8")    
         data = transfer_data.ConvertDataReceived(self, data_received)
-        img_start = len(data) - np.prod(self.InputDim)
+        
         if self.InputType == "Visual":
             """
             If data contains image, try to decode it. 
@@ -58,6 +58,7 @@ class transfer_data():
             this experience in the replay memory. The error does not occur
             often.
             """
+            img_start = -1
             try:
                 image = transfer_data.decode_image(self, data[-1])
                 rem = True
@@ -67,6 +68,7 @@ class transfer_data():
                 rem = False 
         
         elif self.InputType == "LiDAR":
+            img_start = len(data) - np.prod(self.InputDim)
             image = np.array(data[img_start:])
             image = image.reshape([self.InputDim[0],self.InputDim[1]])
             rem = True

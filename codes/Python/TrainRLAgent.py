@@ -56,7 +56,7 @@ replay_epoch = 1      #Number of epoch for an experience replay
 # =============================================================================
 # Other Parameters
 # =============================================================================
-NumPixelHor = 10        #No. of horizontal pixels to resize the image to
+NumPixelHor = 10       #No. of horizontal pixels to resize the image to
 NumPixelVer = 10        #No. of vertical pixels to resize the image to
 DeptEstSpeed = 0.1      #Time delay for depth estimation algorithm
 truestate = 3           #No. of elements in true state excluding LiDAR/image
@@ -126,8 +126,8 @@ if StartNewSim == True:
     
     """Initialise neural network model"""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy_net = DQN(InputDim,layers).to(device)
-    target_net = DQN(InputDim,layers).to(device)
+    policy_net = DQN(InputDim,layers, truestate, action_space_size).to(device)
+    target_net = DQN(InputDim,layers, truestate, action_space_size).to(device)
     target_net.load_state_dict(policy_net.state_dict())
     target_net.eval()
     optimizer = optim.Adam(params = policy_net.parameters(), lr = alpha, )
@@ -136,8 +136,8 @@ elif StartNewSim == False:
     """Get values and models from what was left off"""
     e_c = len(result)
     checkpoint = torch.load(modelpath + '/model_recent.h5')
-    policy_net = DQN(InputDim,layers).to(device)
-    target_net = DQN(InputDim,layers).to(device)
+    policy_net = DQN(InputDim,layers, truestate, action_space_size).to(device)
+    target_net = DQN(InputDim,layers, truestate, action_space_size).to(device)
     policy_net.load_state_dict(checkpoint['state_dict'])
     optimizer = optim.Adam(params = policy_net.parameters(), lr = alpha)
     optimizer.load_state_dict(checkpoint['optimizer'])
@@ -153,7 +153,7 @@ transfer_data = transfer_data(sock, InputType,
                               InputDim, DeptEstSpeed, truestate)
 ExperienceReplay = ExperienceReplay(Experience, batch_size,
                                     replay_epoch, gamma, target_update)
-Agent = Agent(Controller, action_space_size, InputDim)
+Agent = Agent(action_space_size)
 
 # =============================================================================
 # Begin the Training 
@@ -177,7 +177,7 @@ for e in range(e_c,n_episodes):
     
     while not crash and tstep < max_env_steps:
         """Choose and send action to Unity"""
-        if InputType == "LiDAR":
+        if Controller == "RL":
             action = Agent.choose_action_RL(
                     torch.tensor([state]), epsilon, policy_net, image)
         else:
