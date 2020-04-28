@@ -24,7 +24,7 @@ There are 2 types of input that are used in this project:
   
 As you can see, each input has pros and cons. This project will conduct the experiment with each input and assess the effect of their characteristics on the agent's performance in avoiding obstacles. 
 
-![Screenshot](Screenshot/Environment1.png)
+![figures](docs/figures/env1.png)
         
 
 
