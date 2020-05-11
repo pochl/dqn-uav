@@ -1,5 +1,5 @@
 # Fixed-Wing UAV Obstacles Avoidance with Deep Q-Learning
-This project is my 3rd Year dissertation for BEng Mechanical Engineering at the University of Manchester. The project started at the begining of Fall 2019 semester and finised at the end of Spring 2020 semester. The video showing the learning progress and final result of the agent is available at: https://youtu.be/DPaUbFxIfHM
+This project is my 3rd Year dissertation for BEng Mechanical Engineering at the University of Manchester. The project started at the begining of Fall 2019 semester and finised at the end of Spring 2020 semester. The full project report is in the file "Full_Report.pdf". The video showing the learning progress and final result of the agent is available at: https://youtu.be/DPaUbFxIfHM
 
 <img src=docs/figures/env1.png width = 400>     <img src=docs/figures/env2.png width = 400>
 
