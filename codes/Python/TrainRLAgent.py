@@ -67,8 +67,8 @@ sma_period_loss = 1000  #period to caculate moving average of loss graph
 # =============================================================================
 # Get Specifications from Unity 
 # =============================================================================
-mainpath = str(Path(__file__).parents[1])
-SpecPath = mainpath + '/spec.txt'
+#mainpath = str(Path(__file__).parents[1])
+SpecPath = '' + '../spec.txt'
 spec = read_spec(SpecPath,NumPixelHor,NumPixelVer)
 InputDim = [spec.values[0,2], spec.values[0,1]]
 InputType = spec.values[0,0]
@@ -95,7 +95,7 @@ if StartNewSim == True:
     
     """Create new file path for new experiment""" 
     ID = datetime.now().strftime("%d%m%Y%H%M")  
-    newpath = mainpath + '/History'
+    newpath = '../History'
     if not os.path.exists(newpath):
         os.makedirs(newpath)   
     newpath = newpath + '/' + spec.values[0,0] + '_' + Controller + '_' +ID
@@ -217,7 +217,7 @@ for e in range(e_c,n_episodes):
     """Store episodic results in result tank"""
     loss_array += loss_tmt
     positions += positions_tmt
-    result = result.append({'Cumulative Reward': reward_cumu.item(),\
+    result = result.append({'Cumulative Reward': reward_cumu,\
                         'Time Step': tstep,\
                         'Crash': int(crash),\
                         'Straight': act[0],\

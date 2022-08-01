@@ -36,7 +36,7 @@ class Agent():
             action = random.randrange(self.action_space_size)
         else:
             with torch.no_grad():
-                predict = policy_net(state)
+                predict = policy_net(state.float())
                 action = predict.argmax(dim=1).item()   
         return int(action)
 
@@ -104,14 +104,14 @@ class ExperienceReplay():
     @staticmethod
     def Q_current(policy_net, states, actions):
         """Get Q(s_t,a_t)"""
-        return policy_net(states).gather(dim = 1, index=actions.unsqueeze(-1))
+        return policy_net(states.float()).gather(dim = 1, index=actions.unsqueeze(-1))
     
     @staticmethod
     def Q_next(target_net, next_states, crashes):
         """Get max(Q(s_t+1,a_t+1))"""
         final_state_locations = crashes.eq(1).type(torch.bool)
         non_final_state_locations = (final_state_locations == False)
-        non_final_state = next_states[non_final_state_locations]
+        non_final_state = next_states[non_final_state_locations].float()
         batch_size = next_states.shape[0]
         values = torch.zeros(batch_size).to(ExperienceReplay.device)
         values[non_final_state_locations] = \
