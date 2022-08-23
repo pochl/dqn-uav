@@ -69,7 +69,7 @@ def get_moving_average(period, values):
 
 def plot_progress(result, loss_array, crash, e, reward_cumu, newpath, arg):
     """Get simaple moving average of reward and loss"""
-    reward_sma = get_moving_average(arg[0], result["Cumulative Reward"])
+    reward_sma = get_moving_average(arg[0], result["Cumulative Reward"].tolist())
     loss_sma = get_moving_average(arg[1], loss_array)
 
     """assign different marker color depending on who the episode ends"""
