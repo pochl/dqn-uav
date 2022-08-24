@@ -17,8 +17,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from DQL import DQN, Agent
-from OtherFunc import choose_action_HC
+from DQL import DQN
+from src.agent import Agent
 from transfer_data import transfer_data
 
 
@@ -43,7 +43,8 @@ n_episodes = 20  # Max number of episode for each test
 DeptEstSpeed = 0.1
 epsilon = 0  # Set to 0 for testing
 action_space_size = 3
-truestate = 3
+n_observed_states = 3  # No. of observed states excluding LiDAR/image. The array data sent from unity is always
+                       # in the following format: [HIDDEN_STATES, OBSERVED_STATES, DISTANCE_READING]
 
 
 # =============================================================================
@@ -63,6 +64,8 @@ InputDim = [spec.values[0, 2], spec.values[0, 1]]
 InputType = spec.values[0, 0]
 
 """Initialise parameters, result tanks, and replay memory"""
+total_observed_states = n_observed_states + np.prod(InputDim)
+
 epsilon = 0
 
 total_tstep = 0
@@ -75,7 +78,7 @@ if not os.path.exists(testpath):
 
 """Initialise neural network model"""
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-policy_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
+policy_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
 
 """Create connection with Unity"""
 host, port = "127.0.0.1", 25001  # Must be identical to the ones in Unity code
@@ -83,8 +86,8 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((host, port))
 
 """initialise classes"""
-transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, truestate)
-Agent = Agent(action_space_size)
+transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, n_observed_states)
+Agent = Agent(action_space_size, input_dim=InputDim, controller=Controller)
 
 # =============================================================================
 # Begin the Testing
@@ -94,7 +97,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
     file = filename.split("/")[-1]
     file = file[:-3]
     print(file)
-    policy_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
+    policy_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
     policy_net.load_state_dict(torch.load(filename))
     policy_net.eval()
 
@@ -119,39 +122,32 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
         positions_tmt = []
 
         """Initialise the simulation"""
-        data_received = transfer_data.ReceiveData(image_old)
+        transfer_data.ReceiveData()
         transfer_data.SendData([0, 1])  # Reset the environment
 
         """Get first set of state"""
-        data, state, image, rem = transfer_data.ReceiveData(image_old)
-        crash = data[0]
+        state, _ = transfer_data.ReceiveData()
+        crash = state[0]
 
         while not crash and tstep < max_env_steps:
             """Choose and send action to Unity"""
-            if Controller == "RL":
-                action = Agent.choose_action_RL(
-                    torch.tensor([state]), epsilon, policy_net, image
-                )
-            else:
-                action = choose_action_HC(image, InputDim)
+            action = Agent.choose_action(state[-total_observed_states:], epsilon, policy_net)
             transfer_data.SendData([action, 0])
 
             """Get next state and other information from Unity"""
-            data, next_state, image, rem = transfer_data.ReceiveData(image_old)
-            crash = data[0]
-            reward = Agent.get_reward(data)
+            next_state, rem = transfer_data.ReceiveData()
+            crash = next_state[0]
+            reward = Agent.get_reward(next_state)
 
             """Trainsition to the next state"""
             state = next_state
-            image_old = image  # Save previous image in case error occurs
-            # during image dceoding in the next loop
 
             """Append or cumulate results"""
             reward_cumu += reward
             tstep += 1
             act[action] += 1
             total_tstep += 1
-            positions_tmt.append(data[2:4])
+            positions_tmt.append(state[2:4])
 
         """Reset the environment"""
         transfer_data.SendData([0, 1])
@@ -160,7 +156,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
         positions += positions_tmt
         result = result.append(
             {
-                "Cumulative Reward": reward_cumu.item(),
+                "Cumulative Reward": reward_cumu,
                 "Time Step": tstep,
                 "Crash": int(crash),
                 "Straight": act[0],

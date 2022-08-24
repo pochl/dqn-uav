@@ -112,28 +112,3 @@ def save_model(policy_net, optimizer, modelpath, total_tstep, model_save_interva
     """Save neural network model at a specific interval of training steps"""
     s = np.floor(total_tstep / model_save_interval)
     torch.save(policy_net.state_dict(), modelpath + "/model_" + str(int(s + 1)) + ".h5")
-
-
-def choose_action_HC(image, InputDim):
-    """Braitenberg controller"""
-    ray = image.flatten()
-    middle_index = int((len(ray) / InputDim[0]) / 2)
-
-    ray = np.array(ray)
-    ray = ray.reshape([InputDim[0], InputDim[1]])
-    ray = ray.tolist()
-
-    if (len(ray) % 2) != 0:
-        for row in ray:
-            del row[middle_index]
-
-    ray = np.array(ray)
-    ray = np.mean(ray, 0)
-
-    N = [0, 0]
-    for i in range(len(ray)):
-        N_index = i >= middle_index
-        N[N_index] += 1 / (ray[i] ** 2)
-    action = (N.index(min(N)) + 1) * np.sign(1 - np.average(ray))
-
-    return int(action)

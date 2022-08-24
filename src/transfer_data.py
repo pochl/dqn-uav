@@ -17,12 +17,13 @@ import numpy as np
 class transfer_data:
     """Class for transfering data to and from Unity"""
 
-    def __init__(self, sock, InputType, InputDim, DeptEstSpeed, truestate):
+    def __init__(self, sock, InputType, InputDim, DeptEstSpeed, n_observed_states):
         self.sock = sock
         self.InputType = InputType
         self.InputDim = InputDim
         self.DeptEstSpeed = DeptEstSpeed
-        self.truestate = truestate
+        self.n_observed_states = n_observed_states
+        self.image_old = np.ones(InputDim)
 
     def ConvertDataReceived(self, data_received):
         """Convert string of data from Unity to processable list"""
@@ -51,7 +52,7 @@ class transfer_data:
         """Turn RGB type of image into gray-scale image"""
         return np.dot(rgb[..., :3], [0.2989, 0.5870, 0.1140])
 
-    def ReceiveData(self, image_old):
+    def ReceiveData(self):
         """Recieve raw data from Unity and process into state"""
         data_received = self.sock.recv(1024).decode("utf-8")
         data = transfer_data.ConvertDataReceived(self, data_received)
@@ -63,23 +64,24 @@ class transfer_data:
             this experience in the replay memory. The error does not occur
             often.
             """
-            img_start = -1
             try:
                 image = transfer_data.decode_image(self, data[-1])
+                self.image_old = image
                 rem = True
             except:
                 print("error")
                 image = self.image_old
                 rem = False
 
+            data = data[:-1] + list(image.flatten())
+
         elif self.InputType == "LiDAR":
-            img_start = len(data) - np.prod(self.InputDim)
-            image = np.array(data[img_start:])
-            image = image.reshape([self.InputDim[0], self.InputDim[1]])
             rem = True
 
-        state = data[(img_start - self.truestate) : img_start] + list(image.flatten())
-        return data, state, image, rem
+        else:
+            raise ValueError("Invalid input type.")
+
+        return data, rem
 
     def SendData(self, data):
         """

@@ -22,9 +22,9 @@ import pandas as pd
 import torch
 import torch.optim as optim
 
-from DQL import DQN, Agent, ExperienceReplay, ReplayMemory, update_learning_rate
+from DQL import DQN, ExperienceReplay, ReplayMemory, update_learning_rate
+from src.agent import Agent
 from OtherFunc import (
-    choose_action_HC,
     plot_progress,
     read_spec,
     save_model,
@@ -67,7 +67,8 @@ replay_epoch = 1  # Number of epoch for an experience replay
 NumPixelHor = 10  # No. of horizontal pixels to resize the image to
 NumPixelVer = 10  # No. of vertical pixels to resize the image to
 DeptEstSpeed = 0.1  # Time delay for depth estimation algorithm
-truestate = 3  # No. of elements in true state excluding LiDAR/image
+n_observed_states = 3  # No. of observed states excluding LiDAR/image. The array data sent from unity is always
+                       # in the following format: [HIDDEN_STATES, OBSERVED_STATES, DISTANCE_READING]
 action_space_size = 3  # Size of action space
 model_save_interval = 10000  # Interval to save NN model
 sma_period_reward = 100  # period to caculate moving average of reward graph
@@ -85,84 +86,86 @@ InputType = spec.values[0, 0]
 # =============================================================================
 # Start New Training or Continue from what was left off
 # =============================================================================
-if StartNewSim == True:
-    """Initialise parameters, result tanks, and replay memory"""
-    epsilon = epsilon_initial
-    alpha = alpha_initial
-    memory = ReplayMemory(memory_size)
-    loss_array = []
-    positions = []
-    result = pd.DataFrame(
-        columns=[
-            "Cumulative Reward",
-            "Time Step",
-            "Crash",
-            "Straight",
-            "Left Turn",
-            "Right Turn",
-        ]
-    )
-    e_c = 0
-    total_tstep = 0
-    image_old = np.ones([NumPixelVer, NumPixelHor])
-    Experience = namedtuple(
-        "Experience", ("state", "action", "next_state", "reward", "crash")
-    )
+# if StartNewSim == True:
 
-    """Create new file path for new experiment"""
-    ID = datetime.now().strftime("%d%m%Y%H%M")
-    newpath = "../History"
-    if not os.path.exists(newpath):
-        os.makedirs(newpath)
-    newpath = newpath + "/" + spec.values[0, 0] + "_" + Controller + "_" + ID
-    if os.path.exists(newpath):
-        shutil.rmtree(newpath)
-    os.makedirs(newpath)
-    modelpath = newpath + "/model"
-    if not os.path.exists(modelpath):
-        os.makedirs(modelpath)
-
-    """Create text file containing learning parameters for this experiment"""
-    inputs_list = [
-        "gamma = " + str(gamma) + "\n",
-        "epsilon_initial = " + str(epsilon_initial) + "\n",
-        "epsilon_min = " + str(epsilon_min) + "\n",
-        "epsilon_decay = " + str(epsilon_decay) + "\n",
-        "alpha_initial = " + str(alpha_initial) + "\n",
-        "alpha_decay = " + str(alpha_decay) + "\n",
-        "target_update = " + str(target_update) + "\n",
-        "lr_update = " + str(lr_update) + "\n",
-        "memory_size = " + str(memory_size) + "\n",
-        "batch_size = " + str(batch_size) + "\n",
-        "NN = " + str(layers[0]) + "," + str(layers[1]) + "\n",
-        "Outcome:",
+"""Initialise parameters, result tanks, and replay memory"""
+total_observed_states = n_observed_states + np.prod(InputDim)
+epsilon = epsilon_initial
+alpha = alpha_initial
+memory = ReplayMemory(memory_size)
+loss_array = []
+positions = []
+result = pd.DataFrame(
+    columns=[
+        "Cumulative Reward",
+        "Time Step",
+        "Crash",
+        "Straight",
+        "Left Turn",
+        "Right Turn",
     ]
-    file = open(newpath + "/info.txt", "w")
-    file.writelines(inputs_list)
-    file.close()
-    spec.to_csv(newpath + "/spec.csv", index=None, sep=",", mode="a")
+)
+e_c = 0
+total_tstep = 0
+# image_old = np.ones([NumPixelVer, NumPixelHor])
+Experience = namedtuple(
+    "Experience", ("state", "action", "next_state", "reward", "crash")
+)
 
-    """Initialise neural network model"""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    policy_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
-    target_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
-    target_net.load_state_dict(policy_net.state_dict())
-    target_net.eval()
-    optimizer = optim.Adam(
-        params=policy_net.parameters(),
-        lr=alpha,
-    )
+"""Create new file path for new experiment"""
+ID = datetime.now().strftime("%d%m%Y%H%M")
+newpath = "../History"
+if not os.path.exists(newpath):
+    os.makedirs(newpath)
+newpath = newpath + "/" + spec.values[0, 0] + "_" + Controller + "_" + ID
+if os.path.exists(newpath):
+    shutil.rmtree(newpath)
+os.makedirs(newpath)
+modelpath = newpath + "/model"
+if not os.path.exists(modelpath):
+    os.makedirs(modelpath)
 
-elif StartNewSim == False:
-    """Get values and models from what was left off"""
-    e_c = len(result)
-    checkpoint = torch.load(modelpath + "/model_recent.h5")
-    policy_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
-    target_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
-    policy_net.load_state_dict(checkpoint["state_dict"])
-    optimizer = optim.Adam(params=policy_net.parameters(), lr=alpha)
-    optimizer.load_state_dict(checkpoint["optimizer"])
-    target_net.load_state_dict(policy_net.state_dict())
+"""Create text file containing learning parameters for this experiment"""
+inputs_list = [
+    "gamma = " + str(gamma) + "\n",
+    "epsilon_initial = " + str(epsilon_initial) + "\n",
+    "epsilon_min = " + str(epsilon_min) + "\n",
+    "epsilon_decay = " + str(epsilon_decay) + "\n",
+    "alpha_initial = " + str(alpha_initial) + "\n",
+    "alpha_decay = " + str(alpha_decay) + "\n",
+    "target_update = " + str(target_update) + "\n",
+    "lr_update = " + str(lr_update) + "\n",
+    "memory_size = " + str(memory_size) + "\n",
+    "batch_size = " + str(batch_size) + "\n",
+    "NN = " + str(layers[0]) + "," + str(layers[1]) + "\n",
+    "Outcome:",
+]
+file = open(newpath + "/info.txt", "w")
+file.writelines(inputs_list)
+file.close()
+spec.to_csv(newpath + "/spec.csv", index=None, sep=",", mode="a")
+
+"""Initialise neural network model"""
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+policy_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
+target_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()
+optimizer = optim.Adam(
+    params=policy_net.parameters(),
+    lr=alpha,
+)
+
+# elif StartNewSim == False:
+#     """Get values and models from what was left off"""
+#     e_c = len(result)
+#     checkpoint = torch.load(modelpath + "/model_recent.h5")
+#     policy_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
+#     target_net = DQN(InputDim, layers, truestate, action_space_size).to(device)
+#     policy_net.load_state_dict(checkpoint["state_dict"])
+#     optimizer = optim.Adam(params=policy_net.parameters(), lr=alpha)
+#     optimizer.load_state_dict(checkpoint["optimizer"])
+#     target_net.load_state_dict(policy_net.state_dict())
 
 """Create connection with Unity"""
 host, port = "127.0.0.1", 25001  # Must be identical to the ones in Unity code
@@ -170,11 +173,11 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((host, port))
 
 """initialise classes"""
-transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, truestate)
+transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, n_observed_states)
 ExperienceReplay = ExperienceReplay(
     Experience, batch_size, replay_epoch, gamma, target_update
 )
-Agent = Agent(action_space_size)
+Agent = Agent(action_space_size, input_dim=InputDim, controller=Controller)
 
 # =============================================================================
 # Begin the Training
@@ -189,34 +192,29 @@ for e in range(e_c, n_episodes):
     positions_tmt = []
 
     """Initialise the simulation"""
-    data_received = transfer_data.ReceiveData(image_old)
+    transfer_data.ReceiveData()
     transfer_data.SendData([0, 1])  # Reset the environment
 
     """Get first set of state"""
-    data, state, image, rem = transfer_data.ReceiveData(image_old)
-    crash = data[0]
+    state, rem = transfer_data.ReceiveData()
+    crash = state[0]
 
     while not crash and tstep < max_env_steps:
         """Choose and send action to Unity"""
-        if Controller == "RL":
-            action = Agent.choose_action_RL(
-                torch.tensor([state]), epsilon, policy_net, image
-            )
-        else:
-            action = choose_action_HC(image, InputDim)
+        action = Agent.choose_action(state[-total_observed_states:], epsilon, policy_net)
         transfer_data.SendData([action, 0])
 
         """Get next state and other information from Unity"""
-        data, next_state, image, rem = transfer_data.ReceiveData(image_old)
-        crash = data[0]
-        reward = Agent.get_reward(data)
+        next_state, rem = transfer_data.ReceiveData()
+        crash = next_state[0]
+        reward = Agent.get_reward(next_state)
 
         """Store experience in replay memory"""
         memory.push(
             Experience(
-                torch.tensor([state]),
+                torch.tensor([state[-total_observed_states:]]),
                 torch.tensor([action]),
-                torch.tensor([next_state]),
+                torch.tensor([next_state[-total_observed_states:]]),
                 torch.tensor([reward]),
                 torch.tensor([crash]),
             ),
@@ -230,15 +228,13 @@ for e in range(e_c, n_episodes):
 
         """Trainsition to the next state"""
         state = next_state
-        image_old = image  # Save previous image in case error occurs
-        # during image dceoding in the next loop
 
         """Append or cumulate results"""
         reward_cumu += reward
         tstep += 1
         act[action] += 1
         total_tstep += 1
-        positions_tmt.append(data[2:4])
+        positions_tmt.append(state[2:4])
 
     """Reset the environment"""
     transfer_data.SendData([0, 1])

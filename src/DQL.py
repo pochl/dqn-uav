@@ -15,28 +15,6 @@ def update_learning_rate(alpha_initial, alpha_decay, total_tstep, lr_update, opt
         param_group["lr"] = alpha
 
 
-class Agent:
-    def __init__(self, action_space_size):
-        self.action_space_size = action_space_size
-
-    def get_reward(self, data):
-        """Calculate reward at current time step"""
-        distdiff = data[3]
-        crash = bool(data[0])
-        reward = np.sign(distdiff) * (1 - crash) - crash
-        return reward
-
-    def choose_action_RL(self, state, epsilon, policy_net, image):
-        """e-greedy strategy"""
-        if np.random.random() <= epsilon:
-            action = random.randrange(self.action_space_size)
-        else:
-            with torch.no_grad():
-                predict = policy_net(state.float())
-                action = predict.argmax(dim=1).item()
-        return int(action)
-
-
 class DQN(nn.Module):
     def __init__(self, InputDim, layers, truestate, action_space_size):
         super().__init__()
