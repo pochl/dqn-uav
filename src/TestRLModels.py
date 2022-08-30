@@ -18,8 +18,8 @@ import pandas as pd
 import torch
 
 from DQL import DQN
-from src.agent import Agent
-from transfer_data import transfer_data
+from src.controller import Controller
+from communicator import Communicator
 
 
 def numericalSort(value):
@@ -33,7 +33,7 @@ def numericalSort(value):
 """Choose the type of controller. 
 'RL' => Reinforcement Learning controller,
 'HC' => Hand controller (Breaitenberg controller) """
-Controller = "RL"
+controller_type = "RL"
 # =============================================================================
 # Testing Parameters
 # =============================================================================
@@ -86,8 +86,8 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((host, port))
 
 """initialise classes"""
-transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, n_observed_states)
-Agent = Agent(action_space_size, input_dim=InputDim, controller=Controller)
+transfer_data = Communicator(sock, InputType, InputDim, DeptEstSpeed, n_observed_states)
+Agent = Controller(action_space_size, input_dim=InputDim, controller_type=controller_type, policy_net=policy_net)
 
 # =============================================================================
 # Begin the Testing
@@ -131,7 +131,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
 
         while not crash and tstep < max_env_steps:
             """Choose and send action to Unity"""
-            action = Agent.choose_action(state[-total_observed_states:], epsilon, policy_net)
+            action = Agent.choose_action(state[-total_observed_states:], epsilon)
             transfer_data.SendData([action, 0])
 
             """Get next state and other information from Unity"""

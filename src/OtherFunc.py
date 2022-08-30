@@ -7,48 +7,71 @@ Created on Sun Apr 26 21:32:08 2020
 """
 from __future__ import print_function
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from matplotlib import pyplot as plt
+import yaml
 
 
-def read_spec(SpecPath, NumPixelHor, NumPixelVer):
+def load_yaml(path: str):
+    with open(path) as file:
+        yaml_dict = yaml.load(file, Loader=yaml.FullLoader)
+    return yaml_dict
+
+
+def write_yaml(data, path):
+
+    with open(path, 'w') as file:
+        yaml.dump(data, file)
+
+
+def read_spec(path: str):
     """Read specification from Unity"""
-    spec = pd.read_csv(SpecPath, sep=" ", header=None)
-    if spec.values[0, 0] == "Visual":
-        spec_header = [
-            "InputType",
-            "NumPixelHor",
-            "NumPixelVer",
-            "CamFieldOfView",
-            "CamFarPlane",
-            "thrust",
-            "TurnSpeed",
-            "maxRoll",
-            "rollSpeed",
-        ]
-        spec.columns = spec_header
-        spec["NumPixelHor"] = NumPixelHor
-        spec["NumPixelVer"] = NumPixelVer
 
-    elif spec.values[0, 0] == "LiDAR":
-        spec_header = [
-            "InputType",
-            "NumSensorsHor",
-            "NumSensorsVer",
-            "SensorAngleIncHor",
-            "SensorAngleIncVer",
-            "sensorLength",
-            "thrust",
-            "TurnSpeed",
-            "maxRoll",
-            "rollSpeed",
-        ]
+    with open(path) as f:
+        lines = f.read().splitlines()
 
-        spec.columns = spec_header
+    keys = lines[0].split(" ")
+    values = lines[1].split(" ")
+    values[1:] = [int(i) for i in values[1:]]
 
-    return spec
+    return dict(zip(keys, values))
+
+# def read_spec(SpecPath):
+#     """Read specification from Unity"""
+#     spec = pd.read_csv(SpecPath, sep=" ", header=None)
+#     if spec.values[0, 0] == "Visual":
+#         spec_header = [
+#             "InputType",
+#             "NumPixelHor",
+#             "NumPixelVer",
+#             "CamFieldOfView",
+#             "CamFarPlane",
+#             "thrust",
+#             "TurnSpeed",
+#             "maxRoll",
+#             "rollSpeed",
+#         ]
+#         spec.columns = spec_header
+#
+#     elif spec.values[0, 0] == "LiDAR":
+#         spec_header = [
+#             "InputType",
+#             "NumSensorsHor",
+#             "NumSensorsVer",
+#             "SensorAngleIncHor",
+#             "SensorAngleIncVer",
+#             "sensorLength",
+#             "thrust",
+#             "TurnSpeed",
+#             "maxRoll",
+#             "rollSpeed",
+#         ]
+#
+#         spec.columns = spec_header
+#
+#     return spec
 
 
 def get_moving_average(period, values):
@@ -65,6 +88,28 @@ def get_moving_average(period, values):
     else:
         moving_avg = torch.zeros(len(values))
         return moving_avg.numpy()
+
+
+def save_result(positions, loss_array, result, newpath):
+    """Save result, loss, and flight path to files"""
+    positionsdf = pd.DataFrame.from_records(positions, columns=["x", "z"])
+    lossdf = pd.DataFrame(loss_array, columns=["loss"])
+    result.to_csv(newpath + "/result.csv", index=False, header=True)
+    positionsdf.to_csv(newpath + "/positions.csv", index=False, header=True)
+    lossdf.to_csv(newpath + "/loss.csv", index=False, header=True)
+
+
+def save_model(policy_net, optimizer, modelpath, total_tstep, model_save_interval):
+    """Save the most recet neural network model"""
+    policy_net_state = {
+        "state_dict": policy_net.state_dict(),
+        "optimizer": optimizer.state_dict(),
+    }
+    torch.save(policy_net_state, modelpath + "/model_recent.h5")
+
+    """Save neural network model at a specific interval of training steps"""
+    s = np.floor(total_tstep / model_save_interval)
+    torch.save(policy_net.state_dict(), modelpath + "/model_" + str(int(s + 1)) + ".h5")
 
 
 def plot_progress(result, loss_array, crash, e, reward_cumu, newpath, arg):
@@ -90,25 +135,3 @@ def plot_progress(result, loss_array, crash, e, reward_cumu, newpath, arg):
         plt.ylim(0, max(np.array(loss_sma).flatten()) * 1.1)
         plt.savefig(newpath + "/result.png")
         plt.pause(0.0001)
-
-
-def save_result(positions, loss_array, result, newpath):
-    """Save result, loss, and flight path to files"""
-    positionsdf = pd.DataFrame.from_records(positions, columns=["x", "z"])
-    lossdf = pd.DataFrame(loss_array, columns=["loss"])
-    result.to_csv(newpath + "/result.csv", index=False, header=True)
-    positionsdf.to_csv(newpath + "/positions.csv", index=False, header=True)
-    lossdf.to_csv(newpath + "/loss.csv", index=False, header=True)
-
-
-def save_model(policy_net, optimizer, modelpath, total_tstep, model_save_interval):
-    """Save the most recet neural network model"""
-    policy_net_state = {
-        "state_dict": policy_net.state_dict(),
-        "optimizer": optimizer.state_dict(),
-    }
-    torch.save(policy_net_state, modelpath + "/model_recent.h5")
-
-    """Save neural network model at a specific interval of training steps"""
-    s = np.floor(total_tstep / model_save_interval)
-    torch.save(policy_net.state_dict(), modelpath + "/model_" + str(int(s + 1)) + ".h5")

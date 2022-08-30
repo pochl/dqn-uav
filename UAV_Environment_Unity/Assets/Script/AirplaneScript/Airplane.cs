@@ -56,6 +56,7 @@ public class Airplane : MonoBehaviour
     string encodedImage; 
     Vector3 pos;
     float[] info;
+    string[] field;
     float[] DistanceArray;
     float RollAngle;
     float Dist2TargetCurrent;
@@ -74,18 +75,25 @@ public class Airplane : MonoBehaviour
                 SensorAngleIncVer, sensorLength, Speed, TurnSpeed,
                 MaxRollAngle, rollSpeed};
 
+            field = new string[]{"input_type", "dim_h", "dim_v", "ray_angle_h", "ray_angle_v", "ray_length",
+                "speed", "turn_speed", "max_roll_angle", "roll_speed"};
+
         }
         else if (inputType.Equals(InputType.Visual))
         {
-            info = new float[]{ 0, 0, Camera.main.fieldOfView,
+            info = new float[]{0, 0, Camera.main.fieldOfView,
                 Camera.main.farClipPlane, Speed, TurnSpeed, MaxRollAngle,
                 rollSpeed};
+
+            field = new string[]{"input_type", "dim_h", "dim_v", "cam_fov", "cam_clip",
+                "speed", "turn_speed", "max_roll_angle", "roll_speed"};
         }
         string Path = Directory.GetCurrentDirectory();
         var MainPath = Directory.GetParent(@Path);
-        string info_string = string.Join(" ", info);
-        info_string = inputType + " " + info_string;
-        System.IO.File.WriteAllText(@MainPath + "/spec.txt", info_string);
+        string info_string = inputType + " " + string.Join(" ", info);
+        string field_string = string.Join(" ", field);
+        string spec = field_string + "\n" + info_string;
+        System.IO.File.WriteAllText(@MainPath + "/spec.txt", spec);
 
         //Start connection with Python
         ThreadStart ts = new ThreadStart(GetInfo);

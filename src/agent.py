@@ -1,66 +1,94 @@
-from __future__ import print_function
+from typing import List, Union
 
-import random
-
-import numpy as np
 import torch
+import numpy as np
+
+from controller import Controller
+from communicator import Communicator
+from DQL import DQN, ReplayMemory, ExperienceReplayer, experience
 
 
 class Agent:
-    def __init__(self, action_space_size, input_dim, controller: str):
-        self.action_space_size = action_space_size
-        self.input_dim = input_dim
+    """
+
+    """
+
+    def __init__(self,
+                 controller: Controller,
+                 policy_net: DQN,
+                 target_net: DQN,
+                 communicator: Communicator,
+                 replayer: ExperienceReplayer,
+                 optimiser: torch.optim,
+                 memory_size: int,
+                 alpha_initial: float,
+                 alpha_decay: float,
+                 lr_update: int,
+                 epsilon_initial: float,
+                 epsilon_decay: float,
+                 epsilon_min: float
+                 ):
+
         self.controller = controller
+        self.policy_net = policy_net
+        self.target_net = target_net
+        self.communicator = communicator
+        self.memory = ReplayMemory(memory_size)
+        self.replayer = replayer
+        self.optimiser = optimiser
+        self.alpha_initial = alpha_initial
+        self.alpha_decay = alpha_decay
+        self.lr_update = lr_update
+        self.epsilon_initial = epsilon_initial
+        self.epsilon_decay = epsilon_decay
+        self.epsilon_min = epsilon_min
 
-    def get_reward(self, data):
-        """Calculate reward at current time step"""
-        distdiff = data[3]
-        crash = bool(data[0])
-        reward = np.sign(distdiff) * (1 - crash) - crash
-        return reward
+        self._epsilon = self.epsilon_initial
 
-    def choose_action(self, state, epsilon, policy_net):
+        self._previous_state = None
+        self._total_tstep = 0
+        self._action = None
 
-        if self.controller == 'RL':
-            controller_func = self._rl_controller
+    def step(self, observed_state: List[Union[float, int]]):
 
-        else:
-            controller_func = self._braitenberg_controller
+        # Choose and send action to Unity
+        action = self.controller.choose_action(state=observed_state, epsilon=self._epsilon)
+        self.communicator.SendData([action, 0])
 
-        return int(controller_func(state, epsilon, policy_net))
+        self._previous_state = observed_state
+        self._action = action
 
-    def _rl_controller(self, observed_state, epsilon, policy_net):
-        """e-greedy strategy"""
+        self._total_tstep += 1
 
-        if np.random.random() <= epsilon:
-            action = random.randrange(self.action_space_size)
-        else:
-            with torch.no_grad():
-                predict = policy_net(torch.tensor([observed_state]).float())
-                action = predict.argmax(dim=1).item()
-        return int(action)
+    def replay_experience(self, observed_state, reward, crash, rem):
 
-    def _braitenberg_controller(self, observed_state, **kwargs):
-        """Braitenberg controller"""
+        """Store experience in replay memory"""
+        self.memory.push(
+            experience(
+                torch.tensor([self._previous_state]),
+                torch.tensor([self._action]),
+                torch.tensor([observed_state]),
+                torch.tensor([reward]),
+                torch.tensor([crash]),
+            ),
+            rem,
+        )
 
-        distance_array = observed_state[-np.prod(self.input_dim):]
-        middle_index = int((len(distance_array) / self.input_dim[0]) / 2)
+        """Perform experience replay & update target network by the schedule"""
+        self.replayer.replay(
+            self.memory,
+            self.policy_net,
+            self.target_net,
+            self.optimiser,
+            self._total_tstep
+        )
 
-        distance_array = np.array(distance_array)
-        distance_array = distance_array.reshape([self.input_dim[0], self.input_dim[1]])
-        distance_array = distance_array.tolist()
+    def update(self, i_episode: int):
 
-        if (len(distance_array) % 2) != 0:
-            for row in distance_array:
-                del row[middle_index]
+        # Update learning rate
+        alpha = self.alpha_initial * (self.alpha_decay ** np.floor(self._total_tstep / self.lr_update))
+        for param_group in self.optimiser.param_groups:
+            param_group["lr"] = alpha
 
-        distance_array = np.array(distance_array)
-        distance_array = np.mean(distance_array, 0)
-
-        N = [0, 0]
-        for i in range(len(distance_array)):
-            N_index = i >= middle_index
-            N[N_index] += 1 / (distance_array[i] ** 2)
-        action = (N.index(min(N)) + 1) * np.sign(1 - np.average(distance_array))
-
-        return int(action)
+        # Update epsilon
+        self._epsilon = max(self.epsilon_min, self.epsilon_initial * ((1 - self.epsilon_decay) ** i_episode))

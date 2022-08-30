@@ -22,15 +22,15 @@ import pandas as pd
 import torch
 import torch.optim as optim
 
-from DQL import DQN, ExperienceReplay, ReplayMemory, update_learning_rate
-from src.agent import Agent
+from DQL import DQN, ExperienceReplayer, ReplayMemory, update_learning_rate, experience, calculate_reward
+from src.controller import Controller
 from OtherFunc import (
-    plot_progress,
     read_spec,
     save_model,
-    save_result,
+    save_result
 )
-from transfer_data import transfer_data
+from src.OtherFunc import plot_progress
+from communicator import Communicator
 
 # =============================================================================
 
@@ -40,7 +40,8 @@ StartNewSim = True
 """Choose the type of controller. 
 'RL' => Reinforcement Learning controller,
 'HC' => Hand controller (Breaitenberg controller) """
-Controller = "RL"
+controller_type = "RL"
+
 
 # =============================================================================
 # Learning Parameters
@@ -67,7 +68,7 @@ replay_epoch = 1  # Number of epoch for an experience replay
 NumPixelHor = 10  # No. of horizontal pixels to resize the image to
 NumPixelVer = 10  # No. of vertical pixels to resize the image to
 DeptEstSpeed = 0.1  # Time delay for depth estimation algorithm
-n_observed_states = 3  # No. of observed states excluding LiDAR/image. The array data sent from unity is always
+n_hidden_states = 3  # No. of hidden states. The array data sent from unity is always
                        # in the following format: [HIDDEN_STATES, OBSERVED_STATES, DISTANCE_READING]
 action_space_size = 3  # Size of action space
 model_save_interval = 10000  # Interval to save NN model
@@ -89,7 +90,6 @@ InputType = spec.values[0, 0]
 # if StartNewSim == True:
 
 """Initialise parameters, result tanks, and replay memory"""
-total_observed_states = n_observed_states + np.prod(InputDim)
 epsilon = epsilon_initial
 alpha = alpha_initial
 memory = ReplayMemory(memory_size)
@@ -108,16 +108,16 @@ result = pd.DataFrame(
 e_c = 0
 total_tstep = 0
 # image_old = np.ones([NumPixelVer, NumPixelHor])
-Experience = namedtuple(
-    "Experience", ("state", "action", "next_state", "reward", "crash")
-)
+# Experience = namedtuple(
+#     "Experience", ("state", "action", "next_state", "reward", "crash")
+# )
 
 """Create new file path for new experiment"""
 ID = datetime.now().strftime("%d%m%Y%H%M")
 newpath = "../History"
 if not os.path.exists(newpath):
     os.makedirs(newpath)
-newpath = newpath + "/" + spec.values[0, 0] + "_" + Controller + "_" + ID
+newpath = newpath + "/" + spec.values[0, 0] + "_" + controller_type + "_" + ID
 if os.path.exists(newpath):
     shutil.rmtree(newpath)
 os.makedirs(newpath)
@@ -145,16 +145,32 @@ file.writelines(inputs_list)
 file.close()
 spec.to_csv(newpath + "/spec.csv", index=None, sep=",", mode="a")
 
+"""Create connection with Unity"""
+host, port = "127.0.0.1", 25001  # Must be identical to the ones in Unity code
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, port))
+
+communicator = Communicator(sock, InputType, InputDim, DeptEstSpeed)
+initial_data = communicator.ReceiveData()
+communicator.SendData([0, 1])  # Reset the environment
+n_observed_state = len(initial_data[0]) - n_hidden_states
+
 """Initialise neural network model"""
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-policy_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
-target_net = DQN(InputDim, layers, n_observed_states, action_space_size).to(device)
+policy_net = DQN(n_observed_state, layers, action_space_size).to(device)
+target_net = DQN(n_observed_state, layers, action_space_size).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 optimizer = optim.Adam(
     params=policy_net.parameters(),
     lr=alpha,
 )
+
+"""initialise classes"""
+ExperienceReplay = ExperienceReplayer(
+    batch_size, replay_epoch, gamma, target_update
+)
+Agent = Controller(action_space_size, input_dim=InputDim, controller_type=controller_type, policy_net=policy_net)
 
 # elif StartNewSim == False:
 #     """Get values and models from what was left off"""
@@ -167,17 +183,9 @@ optimizer = optim.Adam(
 #     optimizer.load_state_dict(checkpoint["optimizer"])
 #     target_net.load_state_dict(policy_net.state_dict())
 
-"""Create connection with Unity"""
-host, port = "127.0.0.1", 25001  # Must be identical to the ones in Unity code
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((host, port))
 
-"""initialise classes"""
-transfer_data = transfer_data(sock, InputType, InputDim, DeptEstSpeed, n_observed_states)
-ExperienceReplay = ExperienceReplay(
-    Experience, batch_size, replay_epoch, gamma, target_update
-)
-Agent = Agent(action_space_size, input_dim=InputDim, controller=Controller)
+
+
 
 # =============================================================================
 # Begin the Training
@@ -188,33 +196,31 @@ for e in range(e_c, n_episodes):
     reward_cumu = 0
     tstep = 0
     act = [0, 0, 0]
-    loss_tmt = []
     positions_tmt = []
 
     """Initialise the simulation"""
-    transfer_data.ReceiveData()
-    transfer_data.SendData([0, 1])  # Reset the environment
+    # communicator.SendData([0, 1])  # Reset the environment
 
     """Get first set of state"""
-    state, rem = transfer_data.ReceiveData()
+    state, rem = communicator.ReceiveData()
     crash = state[0]
 
     while not crash and tstep < max_env_steps:
         """Choose and send action to Unity"""
-        action = Agent.choose_action(state[-total_observed_states:], epsilon, policy_net)
-        transfer_data.SendData([action, 0])
+        action = Agent.choose_action(state[-n_observed_state:], epsilon)
+        communicator.SendData([action, 0])
 
         """Get next state and other information from Unity"""
-        next_state, rem = transfer_data.ReceiveData()
+        next_state, rem = communicator.ReceiveData()
         crash = next_state[0]
-        reward = Agent.get_reward(next_state)
+        reward = calculate_reward(next_state)
 
         """Store experience in replay memory"""
         memory.push(
-            Experience(
-                torch.tensor([state[-total_observed_states:]]),
+            experience(
+                torch.tensor([state[-n_observed_state:]]),
                 torch.tensor([action]),
-                torch.tensor([next_state[-total_observed_states:]]),
+                torch.tensor([next_state[-n_observed_state:]]),
                 torch.tensor([reward]),
                 torch.tensor([crash]),
             ),
@@ -223,7 +229,7 @@ for e in range(e_c, n_episodes):
 
         """Perform experience replay & update target network by the schedule"""
         ExperienceReplay.replay(
-            memory, policy_net, target_net, optimizer, loss_tmt, total_tstep
+            memory, policy_net, target_net, optimizer, total_tstep
         )
 
         """Trainsition to the next state"""
@@ -232,15 +238,14 @@ for e in range(e_c, n_episodes):
         """Append or cumulate results"""
         reward_cumu += reward
         tstep += 1
-        act[action] += 1
         total_tstep += 1
+        act[action] += 1
         positions_tmt.append(state[2:4])
 
     """Reset the environment"""
-    transfer_data.SendData([0, 1])
+    communicator.SendData([0, 1])
 
     """Store episodic results in result tank"""
-    loss_array += loss_tmt
     positions += positions_tmt
 
     result = pd.concat(
@@ -262,13 +267,13 @@ for e in range(e_c, n_episodes):
     )
 
     """Save results and model"""
-    save_result(positions, loss_array, result, newpath)
+    save_result(positions, ExperienceReplay._loss_record, result, newpath)
     save_model(policy_net, optimizer, modelpath, total_tstep, model_save_interval)
 
     """Plot progress"""
     plot_progress(
         result,
-        loss_array,
+        ExperienceReplay._loss_record,
         crash,
         e,
         reward_cumu,

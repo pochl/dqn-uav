@@ -6,6 +6,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from collections import namedtuple
+
+
+def calculate_reward(data):
+    """Calculate reward at current time step"""
+    distdiff = data[3]
+    crash = bool(data[0])
+    reward = np.sign(distdiff) * (1 - crash) - crash
+    return reward
 
 
 def update_learning_rate(alpha_initial, alpha_decay, total_tstep, lr_update, optimizer):
@@ -15,12 +24,17 @@ def update_learning_rate(alpha_initial, alpha_decay, total_tstep, lr_update, opt
         param_group["lr"] = alpha
 
 
+experience = namedtuple(
+    "experience", ("state", "action", "next_state", "reward", "crash")
+)
+
+
 class DQN(nn.Module):
-    def __init__(self, InputDim, layers, truestate, action_space_size):
+    def __init__(self, n_observed_state, layers, action_space_size):
         super().__init__()
         """create nn layers"""
         self.fc1 = nn.Linear(
-            in_features=np.prod(InputDim) + truestate, out_features=layers[0]
+            in_features=n_observed_state, out_features=layers[0]
         )
         self.fc2 = nn.Linear(in_features=layers[0], out_features=layers[1])
         self.out = nn.Linear(in_features=layers[1], out_features=action_space_size)
@@ -58,19 +72,20 @@ class ReplayMemory:
         return len(self.memory) >= batch_size
 
 
-class ExperienceReplay:
+class ExperienceReplayer:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, Experience, batch_size, replay_epoch, gamma, target_update):
-        self.Experience = Experience
+    def __init__(self, batch_size, replay_epoch, gamma, target_update):
         self.batch_size = batch_size
         self.replay_epoch = replay_epoch
         self.gamma = gamma
         self.target_update = target_update
 
+        self._loss_record = []
+
     def extract_tensors(self, experiences):
-        batch = self.Experience(*zip(*experiences))
+        batch = experience(*zip(*experiences))
         t1 = torch.cat(batch.state)
         t2 = torch.cat(batch.action)
         t3 = torch.cat(batch.reward)
@@ -90,13 +105,13 @@ class ExperienceReplay:
         non_final_state_locations = final_state_locations == False
         non_final_state = next_states[non_final_state_locations].float()
         batch_size = next_states.shape[0]
-        values = torch.zeros(batch_size).to(ExperienceReplay.device)
+        values = torch.zeros(batch_size).to(ExperienceReplayer.device)
         values[non_final_state_locations] = (
             target_net(non_final_state).max(dim=1)[0].detach()
         )
         return values
 
-    def replay(self, memory, policy_net, target_net, optimizer, loss_tmt, total_tstep):
+    def replay(self, memory, policy_net, target_net, optimizer, total_tstep):
         if memory.can_provide_sample(self.batch_size):
 
             """Update target network if it's time for update"""
@@ -113,11 +128,11 @@ class ExperienceReplay:
                     rewards,
                     next_states,
                     crashes,
-                ) = ExperienceReplay.extract_tensors(self, experiences)
-                current_q_values = ExperienceReplay.Q_current(
+                ) = ExperienceReplayer.extract_tensors(self, experiences)
+                current_q_values = ExperienceReplayer.Q_current(
                     policy_net, states, actions
                 )
-                next_q_values = ExperienceReplay.Q_next(
+                next_q_values = ExperienceReplayer.Q_next(
                     target_net, next_states, crashes
                 )
                 target_q_values = (next_q_values * self.gamma) + rewards
@@ -127,4 +142,5 @@ class ExperienceReplay:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                loss_tmt.append(loss.item())
+
+                self._loss_record.append(loss.item())
