@@ -1,2 +1,2 @@
 input_type dim_h dim_v ray_angle_h ray_angle_v ray_length speed turn_speed max_roll_angle roll_speed
-LiDAR 7 2 3 0 20 10 90 30 0
+LiDAR 31 1 3 0 20 10 90 30 0

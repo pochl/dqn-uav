@@ -1,0 +1,5 @@
+experiment: "LiDAR_AI_300820220026"  # Experiment folder to test
+max_env_steps: 220  # Maximum steps of each episode
+n_episodes: 20  # Max number of episode for each test
+
+

@@ -17,9 +17,9 @@ import numpy as np
 import pandas as pd
 import torch
 
-from DQL import DQN
-from src.controller import Controller
-from communicator import Communicator
+from src.libs.dql import DQN
+from src.libs.controller import Controller
+from src.libs.communicator import Communicator
 
 
 def numericalSort(value):
@@ -122,20 +122,20 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
         positions_tmt = []
 
         """Initialise the simulation"""
-        transfer_data.ReceiveData()
-        transfer_data.SendData([0, 1])  # Reset the environment
+        transfer_data.receive_data()
+        transfer_data.send_data([0, 1])  # Reset the environment
 
         """Get first set of state"""
-        state, _ = transfer_data.ReceiveData()
+        state, _ = transfer_data.receive_data()
         crash = state[0]
 
         while not crash and tstep < max_env_steps:
             """Choose and send action to Unity"""
             action = Agent.choose_action(state[-total_observed_states:], epsilon)
-            transfer_data.SendData([action, 0])
+            transfer_data.send_data([action, 0])
 
             """Get next state and other information from Unity"""
-            next_state, rem = transfer_data.ReceiveData()
+            next_state, rem = transfer_data.receive_data()
             crash = next_state[0]
             reward = Agent.get_reward(next_state)
 
@@ -150,7 +150,7 @@ for filename in sorted(glob.glob(os.path.join(modelpath, "*.h5")), key=numerical
             positions_tmt.append(state[2:4])
 
         """Reset the environment"""
-        transfer_data.SendData([0, 1])
+        transfer_data.send_data([0, 1])
 
         """Store episodic results in result tank"""
         positions += positions_tmt
