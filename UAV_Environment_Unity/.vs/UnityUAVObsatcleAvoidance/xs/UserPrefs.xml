@@ -1,0 +1,31 @@
+﻿<Properties StartupConfiguration="{EB3D5865-EBF0-1CD4-BB3D-3495AF2BA685}|">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets/Shaders/RenderDepth.shader">
+    <Files>
+      <File FileName="Assets/Script/CameraScript/RenderDepth.cs" Line="43" Column="1" />
+      <File FileName="Assets/Shaders/RenderDepth.shader" Line="3" Column="27" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="UnityUAVObsatcleAvoidance" expanded="True">
+            <Node name="Assets" expanded="True">
+              <Node name="Script" expanded="True">
+                <Node name="CameraScript" expanded="True" />
+              </Node>
+              <Node name="Shaders" expanded="True">
+                <Node name="RenderDepth.shader" selected="True" />
+              </Node>
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.ItemProperties.Assembly-CSharp PreferredExecutionTarget="84dee324-9095-4127-a08c-93f5d7fa9769" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+</Properties>

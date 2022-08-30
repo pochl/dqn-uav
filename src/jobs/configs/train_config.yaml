@@ -1,0 +1,34 @@
+environment_params:
+  controller_type: 'AI' # Either 'AI' or 'RB' (Rule-based)
+  dept_est_speed: 0.1  # Time delay for depth estimation algorithm
+  n_hidden_states: 3  # No. of hidden states. The array data sent from unity is always
+                      # in the following format: [HIDDEN_STATES, OBSERVED_STATES, DISTANCE_READING]
+  action_space_size: 3  # Size of action space
+
+
+
+learning_params:
+  gamma: 0.95  # Reward discount factor
+  epsilon_initial: 1  # Initial value of epsilon
+  epsilon_min: 0.01  # Minimum possible epsilon (the value it will anneal to)
+  epsilon_decay: 0.003  # Epsilon decay factor. (Higher -> faster decay rate)
+  alpha_initial: 0.001  # Initial value of learning rate
+  alpha_decay: 0.5  # Learning rate decay factor (Hgiher -> slower decay)
+  batch_size: 64  # The size of the batch of sampled experiences
+  target_update: 3000  # Interval to update target network
+  alpha_update: 30000  # Interval to step down learning rate
+  memory_size: 300000  # Capacity of replay memory
+  layers:  # Number of nodes of 1st, 2nd, ... hidden layers of NN
+    - 128
+    - 128
+  max_env_steps: 1000  # Maximum training steps of each episode
+  n_episodes: 10000  # Maximum number of episodes for one training
+  replay_epoch: 1  # Number of epoch for an experience replay
+
+other_params:
+  n_pixel_h: 10  # No. of horizontal pixels to resize the image to
+  n_pixel_v: 10  # No. of vertical pixels to resize the image to
+  model_save_interval: 10000  # Interval to save NN model
+  sma_period_reward: 100  # period to calculate moving average of reward graph
+  sma_period_loss: 1000  # period to calculate moving average of loss graph
+

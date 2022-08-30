@@ -1,0 +1,35 @@
+﻿<Properties StartupConfiguration="{388EC336-D82C-4B51-8E99-306AAB0A002E}|">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets/Script/AirplaneScript/Airplane.cs">
+    <Files>
+      <File FileName="Assets/Script/AirplaneScript/Airplane.cs" Line="131" Column="55" />
+      <File FileName="Assets/Script/ObstaclesRandomSpawn/RS_syn_2.cs" />
+      <File FileName="Assets/Script/ObstaclesRandomSpawn/ObsCom.cs" />
+      <File FileName="Assets/Script/ObstaclesRandomSpawn/RS1.cs" />
+      <File FileName="Assets/Script/ObstaclesRandomSpawn/RS_syn_1.cs" Line="72" Column="32" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="PlaneRL_simple" expanded="True">
+            <Node name="Assets" expanded="True">
+              <Node name="Script" expanded="True">
+                <Node name="AirplaneScript" expanded="True">
+                  <Node name="Airplane.cs" selected="True" />
+                </Node>
+                <Node name="CameraScript" expanded="True" />
+                <Node name="ObstaclesRandomSpawn" expanded="True" />
+              </Node>
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.ItemProperties.Assembly-CSharp PreferredExecutionTarget="438cf769-5138-40d8-a0b6-1f4b18fac983" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+</Properties>
