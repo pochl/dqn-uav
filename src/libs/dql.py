@@ -1,11 +1,11 @@
-from typing import List, Union, Tuple
-from collections import namedtuple
 import random
+from collections import namedtuple
+from typing import List, Tuple, Union, NamedTuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 def calculate_reward(state: List[Union[float, int]]) -> Union[int, float]:
@@ -29,18 +29,18 @@ class DQN(nn.Module):
 
     Attributes:
         n_observed_state (int): Number of observed state.
-        layers (Tuple[int]): (NUMBER OF NODES AT 1ST LAYER, NUMBER OF NODES AT 2ND LAYER)
+        layers (Tuple[int, int]): (NUMBER OF NODES AT 1ST LAYER, NUMBER OF NODES AT 2ND LAYER)
         action_space_size (int): The number of the possible actions for the agent to take.
 
     """
 
-    def __init__(self, n_observed_state: int, layers: Tuple[int], action_space_size: int):
+    def __init__(
+        self, n_observed_state: int, layers: Tuple[int, int], action_space_size: int
+    ):
         """Initialises the model."""
 
         super().__init__()
-        self.fc1 = nn.Linear(
-            in_features=n_observed_state, out_features=layers[0]
-        )
+        self.fc1 = nn.Linear(in_features=n_observed_state, out_features=layers[0])
         self.fc2 = nn.Linear(in_features=layers[0], out_features=layers[1])
         self.out = nn.Linear(in_features=layers[1], out_features=action_space_size)
 
@@ -62,7 +62,8 @@ class DQN(nn.Module):
 
 
 class ReplayMemory:
-    """Replay memory class. This class is used to manage the memory that will be replayed to train the model.
+    """Replay memory class. This class is used to manage the memory that will be replayed to
+    train the model.
 
     Attributes:
         capacity (int): Capacity of the memory.
@@ -75,7 +76,7 @@ class ReplayMemory:
         self._memory = []
         self._push_count = 0
 
-    def push(self, experience: namedtuple):
+    def push(self, experience: NamedTuple):
         """Pushes the experience into the memory.
 
         Args:
@@ -90,7 +91,7 @@ class ReplayMemory:
             self._memory[self._push_count % self.capacity] = experience
         self._push_count += 1
 
-    def sample(self, batch_size: int) -> List[namedtuple]:
+    def sample(self, batch_size: int) -> List[NamedTuple]:
         """Samples a batch of experience.
 
         Args:
@@ -123,26 +124,29 @@ class ExperienceReplayer:
         replay_epoch (int): Number of epoch to train the model for.
         gamma (float): Discounted reward factor.
         target_update (int): At every X simulation steps, the target net work will be updated.
-        _loss_record (List[float]): The list of loss values.
-        _experience (namedtuple): The experience tuple.
+        loss_record (List[float]): The list of loss values.
+        experience (namedtuple): The experience tuple.
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def __init__(self, batch_size: int, replay_epoch: int, gamma: float, target_update: int):
+    def __init__(
+        self, batch_size: int, replay_epoch: int, gamma: float, target_update: int
+    ):
         self.batch_size = batch_size
         self.replay_epoch = replay_epoch
         self.gamma = gamma
         self.target_update = target_update
 
-        self._loss_record = []
+        self.loss_record: List[float] = []
 
-        self._experience = namedtuple(
+        self.experience = namedtuple(
             "experience", ("state", "action", "next_state", "reward", "crash")
         )
 
-    def extract_tensors(self, experiences: List[namedtuple]) -> Tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def extract_tensors(
+        self, experiences: List[NamedTuple]
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Extracts the experiences into tensors.
 
         Args:
@@ -153,17 +157,19 @@ class ExperienceReplayer:
                 (state, action, reward, next_state, crash)
         """
 
-        batch = self._experience(*zip(*experiences))
-        t1 = torch.cat(batch.state)
-        t2 = torch.cat(batch.action)
-        t3 = torch.cat(batch.reward)
-        t4 = torch.cat(batch.next_state)
-        t5 = torch.cat(batch.crash)
+        batch = self.experience(*zip(*experiences))
+        ten_1 = torch.cat(batch.state)
+        ten_2 = torch.cat(batch.action)
+        ten_3 = torch.cat(batch.reward)
+        ten_4 = torch.cat(batch.next_state)
+        ten_5 = torch.cat(batch.crash)
 
-        return t1, t2, t3, t4, t5
+        return ten_1, ten_2, ten_3, ten_4, ten_5
 
     @staticmethod
-    def q_current(policy_net: DQN, states: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+    def q_current(
+        policy_net: DQN, states: torch.Tensor, actions: torch.Tensor
+    ) -> torch.Tensor:
         """Gets the current q value. I.E. Q(s_t,a_t).
 
         Args:
@@ -178,7 +184,9 @@ class ExperienceReplayer:
         return policy_net(states.float()).gather(dim=1, index=actions.unsqueeze(-1))
 
     @staticmethod
-    def q_next(target_net: DQN, next_states: torch.Tensor, crashes: torch.Tensor) -> torch.Tensor:
+    def q_next(
+        target_net: DQN, next_states: torch.Tensor, crashes: torch.Tensor
+    ) -> torch.Tensor:
         """Gets the next Q value. I.E.  max(Q(s_t+1,a_t+1)).
 
         Args:
@@ -202,12 +210,14 @@ class ExperienceReplayer:
 
         return values
 
-    def replay(self,
-               memory: ReplayMemory,
-               policy_net: DQN,
-               target_net: DQN,
-               optimiser: torch.optim.Optimizer,
-               total_tstep: int):
+    def replay(
+        self,
+        memory: ReplayMemory,
+        policy_net: DQN,
+        target_net: DQN,
+        optimiser: torch.optim.Optimizer,
+        total_tstep: int,
+    ):
         """Replays the experiences.
 
         Args:
@@ -220,12 +230,12 @@ class ExperienceReplayer:
 
         if memory.can_provide_sample(self.batch_size):
             # Update target network if it's time for update.
-            if total_tstep % self.target_update == 0:
+            if not total_tstep % self.target_update:
                 target_net.load_state_dict(policy_net.state_dict())
                 print("target network updated")
 
             # Perform experience replay.
-            for epoch in range(self.replay_epoch):
+            for _ in range(self.replay_epoch):
                 experiences = memory.sample(self.batch_size)  # Sample experiences
                 (
                     states,
@@ -248,4 +258,4 @@ class ExperienceReplayer:
                 loss.backward()
                 optimiser.step()
 
-                self._loss_record.append(loss.item())
+                self.loss_record.append(loss.item())

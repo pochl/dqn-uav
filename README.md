@@ -1,11 +1,11 @@
 # Fixed-Wing UAV Obstacles Avoidance with Deep Q-Learning
-This project is my 3rd Year dissertation for BEng Mechanical Engineering at the University of Manchester. The project started at the begining of Fall 2019 semester and finised at the end of Spring 2020 semester under the supervision of Prof. William Crowther. The full project report is in the file "Full_Report.pdf". The video showing the learning progress and final result of the agent is available at: https://youtu.be/DPaUbFxIfHM
+This project is my 3rd Year dissertation for BEng Mechanical Engineering at the University of Manchester. The project started at the beginning of Fall 2019 semester and finished at the end of Spring 2020 semester under the supervision of Prof. William Crowther. The full project report is in the file `docs/Full_Report.pdf`. The video showing the learning progress and final result of the agent is available at: https://youtu.be/DPaUbFxIfHM
 
 <img src=docs/figures/env1.png width = 400>     <img src=docs/figures/env2.png width = 400>
 
 
 ## Project Description
-This project implements Deep Q-Learning into one of the most heavily researched tasks in automation, obstacles avoidance. The environment and the UAV itself are simulated in Unity3D, while the DQL algorithm is written Python. The action of the UAV is constrained into only turning left, right, and going straight. That means its movement is limited to a 2D horizontal plane, very similar to a car. However, the UAV also roll while it's turining, just like a normal plane that needs to roll in order to turn. Thus, the environment is still in 3D. 
+This project implements Deep Q-Learning into one of the most heavily researched tasks in automation, obstacles avoidance. The environment and the UAV itself are simulated in Unity3D, while the DQL algorithm is written Python. The action of the UAV is constrained into only turning left, right, and going straight. That means its movement is limited to a 2D horizontal plane, very similar to a car. However, the UAV also rolls while it's turning, just like a normal plane that needs to roll in order to turn. Thus, the environment is still in 3D. 
 
 The goal of the agent is to fly in the forest of obstacles for a certain period of time. To prevent the agent from circling around, target point is introduced for the agent to fly to. This target point is NOT for the agent to reach, but only to guide the UAV into one particular direction. 
 

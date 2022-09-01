@@ -1,14 +1,15 @@
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
-import torch
 import numpy as np
+import torch
 
-from src.libs.controller import Controller
 from src.libs.communicator import Communicator
-from src.libs.dql import DQN, ReplayMemory, ExperienceReplayer
+from src.libs.controller import Controller
+from src.libs.dql import DQN, ExperienceReplayer, ReplayMemory
 
 
 class Agent:
+    # pylint: disable=[R0902(too-many-instance-attributes)]
     """RL agent.
 
     Attributes:
@@ -28,25 +29,27 @@ class Agent:
         epsilon_min (Optional[float]: Minimum value of epsilon.
         _epsilon (float): Current value of epsilon
         _previous_state (List[Union[float, int]]): Previous observed state.
-        _total_tstep (int): Total number of steps that the agent has been played.
-        _action (int): Action that the agent takes.
+        total_tstep (int): Total number of steps that the agent has been played.
+        action (int): Action that the agent takes.
     """
 
-    def __init__(self,
-                 controller: Controller,
-                 communicator: Communicator,
-                 policy_net: DQN,
-                 target_net: Optional[DQN] = None,
-                 replayer: Optional[ExperienceReplayer] = None,
-                 optimiser: Optional[torch.optim.Optimizer] = None,
-                 memory_size: Optional[int] = None,
-                 alpha_initial: Optional[float] = None,
-                 alpha_decay: Optional[float] = None,
-                 alpha_update: Optional[int] = None,
-                 epsilon_initial: Optional[float] = None,
-                 epsilon_decay: Optional[float] = None,
-                 epsilon_min: Optional[float] = None
-                 ):
+    # pylint: disable=[R0913(too-many-arguments)]
+    def __init__(
+        self,
+        controller: Controller,
+        communicator: Communicator,
+        policy_net: DQN,
+        target_net: Optional[DQN] = None,
+        replayer: Optional[ExperienceReplayer] = None,
+        optimiser: Optional[torch.optim.Optimizer] = None,
+        memory_size: int = 10000,
+        alpha_initial: float = 0.001,
+        alpha_decay: float = 0.5,
+        alpha_update: int = 3000,
+        epsilon_initial: float = 1,
+        epsilon_decay: float = 0.01,
+        epsilon_min: float = 0.003,
+    ):
 
         self.controller = controller
         self.policy_net = policy_net
@@ -64,8 +67,8 @@ class Agent:
 
         self._epsilon = self.epsilon_initial
         self._previous_state = None
-        self._total_tstep = 0
-        self._action = None
+        self.total_tstep = 0
+        self.action = None
 
     def step(self, observed_state: List[Union[float, int]]):
         """Steps towards the next simulation step.
@@ -80,14 +83,16 @@ class Agent:
         self.communicator.send_data([action, 0])
 
         self._previous_state = observed_state
-        self._action = action
+        self.action = action
 
-        self._total_tstep += 1
+        self.total_tstep += 1
 
-    def replay_experience(self,
-                          observed_state: List[Union[float, int]],
-                          reward: Union[float, int],
-                          crash: int):
+    def replay_experience(
+        self,
+        observed_state: List[Union[float, int]],
+        reward: Union[float, int],
+        crash: int,
+    ):
         """Replays the stored experience in the memory to learn and update the Q-Network.
 
         Args:
@@ -98,9 +103,9 @@ class Agent:
 
         # Store experience in replay memory
         self.memory.push(
-            self.replayer._experience(
+            self.replayer.experience(
                 torch.tensor([self._previous_state]),
-                torch.tensor([self._action]),
+                torch.tensor([self.action]),
                 torch.tensor([observed_state]),
                 torch.tensor([reward]),
                 torch.tensor([crash]),
@@ -113,7 +118,7 @@ class Agent:
             self.policy_net,
             self.target_net,
             self.optimiser,
-            self._total_tstep
+            self.total_tstep,
         )
 
     def update(self, i_episode: int):
@@ -126,9 +131,14 @@ class Agent:
         if self.optimiser:
 
             # Update learning rate
-            alpha = self.alpha_initial * (self.alpha_decay ** np.floor(self._total_tstep / self.alpha_update))
+            alpha = self.alpha_initial * (
+                self.alpha_decay ** np.floor(self.total_tstep / self.alpha_update)
+            )
             for param_group in self.optimiser.param_groups:
                 param_group["lr"] = alpha
 
             # Update epsilon
-            self._epsilon = max(self.epsilon_min, self.epsilon_initial * ((1 - self.epsilon_decay) ** i_episode))
+            self._epsilon = max(
+                self.epsilon_min,
+                self.epsilon_initial * ((1 - self.epsilon_decay) ** i_episode),
+            )

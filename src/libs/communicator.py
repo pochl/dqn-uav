@@ -1,10 +1,12 @@
-from typing import Tuple, Union, List
+import socket
 import time
 from base64 import b64decode
-import socket
+from typing import List, Tuple, Union
 
 import cv2
 import numpy as np
+
+from src.libs.utils import rgb2gray
 
 
 class Communicator:
@@ -20,7 +22,12 @@ class Communicator:
         _sock (socket.socket): Socket object.
     """
 
-    def __init__(self, input_type: str, input_dim: Tuple[int, int], dept_est_speed: Union[int, float]):
+    def __init__(
+        self,
+        input_type: str,
+        input_dim: Tuple[int, int],
+        dept_est_speed: Union[int, float],
+    ):
         self.input_type = input_type
         self.input_dim = input_dim
         self.dept_est_speed = dept_est_speed
@@ -48,15 +55,24 @@ class Communicator:
 
         Returns:
             List[Union[int, float, str]]: Converted data.
+
+        Raises:
+            ValueError: Invalid Input Type.
         """
         split_list = data_received.split(" ")
         if self.input_type == "Visual":
-            return [float(elm) for i, elm in enumerate(split_list) if (i != len(split_list)-1)]
+            return [
+                float(elm)
+                for i, elm in enumerate(split_list)
+                if (i != len(split_list) - 1)
+            ]
 
-        elif self.input_type == "LiDAR":
+        if self.input_type == "LiDAR":
             return list(map(float, split_list))
 
-    def decode_image(self, base64_img: str) -> np.array:
+        raise ValueError("Invalid Input Type.")
+
+    def decode_image(self, base64_img: str) -> np.ndarray:
         """Decodes base64 from Unity to image.
 
         Args:
@@ -65,10 +81,10 @@ class Communicator:
         Returns:
             np.array: Decoded image in gray scale, ranging from 0 to 1.
         """
-        a = b64decode(base64_img)
-        np_arr = np.frombuffer(a, np.uint8)
+
+        np_arr = np.frombuffer(b64decode(base64_img), np.uint8)
         img_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        image = np.round(Communicator.rgb2gray(img_np))
+        image = np.round(rgb2gray(img_np))
         image = cv2.resize(
             image, (self.input_dim[1], self.input_dim[0]), interpolation=cv2.INTER_AREA
         )
@@ -77,11 +93,15 @@ class Communicator:
         time.sleep(max(0, self.dept_est_speed))
         return image / 255  # Standardise the pixel value into 0 - 1
 
+    # pylint: disable=[W0702(bare-except)]
     def receive_data(self) -> List[Union[int, float]]:
         """Recieves raw data from Unity and process into state
 
         Returns:
             List[Union[int, float]]: State.
+
+        Raises:
+            ValueError: Invalid input type.
         """
         data_received = self._sock.recv(1024).decode("utf-8")
         data = Communicator.convert_received_data(self, data_received)
@@ -97,11 +117,10 @@ class Communicator:
 
             return data[:-1] + list(image.flatten())
 
-        elif self.input_type == "LiDAR":
+        if self.input_type == "LiDAR":
             return data
 
-        else:
-            raise ValueError("Invalid input type.")
+        raise ValueError("Invalid input type.")
 
     def send_data(self, data: List[int]):
         """Sends action and command to whether to reset the environment to Unity.

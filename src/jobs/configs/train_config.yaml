@@ -13,14 +13,14 @@ learning_params:
   epsilon_min: 0.01  # Minimum possible epsilon (the value it will anneal to)
   epsilon_decay: 0.003  # Epsilon decay factor. (Higher -> faster decay rate)
   alpha_initial: 0.001  # Initial value of learning rate
-  alpha_decay: 0.5  # Learning rate decay factor (Hgiher -> slower decay)
-  batch_size: 64  # The size of the batch of sampled experiences
-  target_update: 3000  # Interval to update target network
   alpha_update: 30000  # Interval to step down learning rate
+  alpha_decay: 0.5  # Learning rate decay factor (Higher -> slower decay)
+  batch_size: 64  # The size of the batch of sampled experiences
+  target_update: 1000  # Interval to update target network
   memory_size: 300000  # Capacity of replay memory
   layers:  # Number of nodes of 1st, 2nd, ... hidden layers of NN
-    - 128
-    - 128
+    - 16
+    - 16
   max_env_steps: 1000  # Maximum training steps of each episode
   n_episodes: 10000  # Maximum number of episodes for one training
   replay_epoch: 1  # Number of epoch for an experience replay
